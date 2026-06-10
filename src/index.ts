@@ -50,6 +50,10 @@ app.get("/api/resumen", async (_req, res, next) => {
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+if (process.env.VERCEL !== "1") {
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  });
+}
+
+export default app;
