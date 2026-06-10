@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Month {
+  id       String   @id @default(cuid())
+  label    String
+  year     Int
+  month    Int
+  ingresos Ingreso[]
+  gastos   Gasto[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ingreso {
+  id       String @id @default(cuid())
+  concepto String
+  monto    Float
+  monthId  String
+  month    Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+}
+
+model Gasto {
+  id        String @id @default(cuid())
+  concepto  String
+  monto     Float
+  categoria String
+  fin       String
+  monthId   String
+  month     Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+}
