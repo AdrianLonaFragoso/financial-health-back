@@ -31,12 +31,8 @@ router.post("/", async (req: Request, res: Response) => {
       label,
       year,
       month,
-      ingresos: {
-        create: ingresos ?? [],
-      },
-      gastos: {
-        create: gastos ?? [],
-      },
+      ingresos: { create: ingresos ?? [] },
+      gastos: { create: gastos ?? [] },
     },
     include: { ingresos: true, gastos: true },
   });

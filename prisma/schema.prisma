@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Month {
@@ -20,19 +19,19 @@ model Month {
 }
 
 model Ingreso {
-  id       String @id @default(cuid())
+  id       String @id @default(uuid())
   concepto String
   monto    Float
-  monthId  String
+  monthId  String @map("month_id")
   month    Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
 }
 
 model Gasto {
-  id        String @id @default(cuid())
+  id        String @id @default(uuid())
   concepto  String
   monto     Float
   categoria String
   fin       String
-  monthId   String
+  monthId   String @map("month_id")
   month     Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
 }

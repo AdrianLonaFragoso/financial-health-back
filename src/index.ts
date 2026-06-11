@@ -1,12 +1,13 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Express } from "express";
 import cors from "cors";
+import prisma from "./db";
 import mesesRouter from "./routes/meses";
 import gastosRouter from "./routes/gastos";
 import ingresosRouter from "./routes/ingresos";
 import { errorHandler } from "./middleware/errorHandler";
 
-const app = express();
+const app: Express = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
 app.use(cors());
@@ -22,11 +23,9 @@ app.use("/api/meses/:monthId/ingresos", ingresosRouter);
 
 app.get("/api/resumen", async (_req, res, next) => {
   try {
-    const meses = await import("./db").then((m) =>
-      m.default.month.findMany({
-        include: { ingresos: true, gastos: true },
-      })
-    );
+    const meses = await prisma.month.findMany({
+      include: { ingresos: true, gastos: true },
+    });
 
     const totalIngresos = meses.reduce(
       (acc, m) => acc + m.ingresos.reduce((s, i) => s + i.monto, 0),
