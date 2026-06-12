@@ -5,6 +5,18 @@ import { PrismaPg } from "@prisma/adapter-pg";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
+const CREDITOS_SEED = [
+  { tipo: "tarjeta", nombre: "Banamex Costco", lineaCredito: 97500, saldoUtilizado: 36164.79, tasaInteresMensual: 6.53, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "HSBC Zero", lineaCredito: 120000, saldoUtilizado: 0, tasaInteresMensual: 7.71, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Liverpool Grey", lineaCredito: 6000, saldoUtilizado: 0, tasaInteresMensual: 5.94, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Rappi", lineaCredito: 78000, saldoUtilizado: 19392.55, tasaInteresMensual: 5.38, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "American Express", lineaCredito: 268000, saldoUtilizado: 10737.06, tasaInteresMensual: 7.44, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "NU", lineaCredito: 50000, saldoUtilizado: 0, tasaInteresMensual: 8.04, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "BBVA", lineaCredito: 180000, saldoUtilizado: 8371.56, tasaInteresMensual: 6.21, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Liverpool Rosa", lineaCredito: 20000, saldoUtilizado: 1877.30, tasaInteresMensual: 5.18, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Plata", lineaCredito: 20000, saldoUtilizado: 1656.08, tasaInteresMensual: 9.02, usuario: "Adrian" },
+];
+
 const SEED_DATA = [
   {
     label: "Junio 2026",
@@ -124,7 +136,12 @@ async function main() {
       },
     });
   }
-  console.log("Seed completado: 3 meses insertados");
+  console.log("Seed: 3 meses insertados");
+
+  for (const data of CREDITOS_SEED) {
+    await prisma.credito.create({ data });
+  }
+  console.log(`Seed: ${CREDITOS_SEED.length} créditos insertados`);
 }
 
 main()
