@@ -1,0 +1,69 @@
+{
+  "version": "5.2",
+  "steps": [
+    {
+      "tag": "CreateSchema",
+      "schema": "public"
+    },
+    {
+      "tag": "CreateTable",
+      "table": "Month",
+      "columns": [
+        { "name": "id", "type": "TEXT", "default": { "name": "gen_random_uuid()" }, "primaryKey": true },
+        { "name": "label", "type": "TEXT" },
+        { "name": "year", "type": "Int32" },
+        { "name": "month", "type": "Int32" },
+        { "name": "createdAt", "type": "DateTime", "default": { "name": "now()" } },
+        { "name": "updatedAt", "type": "DateTime", "default": { "name": "now()" } }
+      ]
+    },
+    {
+      "tag": "CreateTable",
+      "table": "Ingreso",
+      "columns": [
+        { "name": "id", "type": "TEXT", "default": { "name": "gen_random_uuid()" }, "primaryKey": true },
+        { "name": "concepto", "type": "TEXT" },
+        { "name": "monto", "type": "Float" },
+        { "name": "month_id", "type": "TEXT" }
+      ],
+      "foreignKeys": [
+        { "columns": ["month_id"], "referencedTable": "Month", "referencedColumns": ["id"] }
+      ]
+    },
+    {
+      "tag": "CreateTable",
+      "table": "Gasto",
+      "columns": [
+        { "name": "id", "type": "TEXT", "default": { "name": "gen_random_uuid()" }, "primaryKey": true },
+        { "name": "concepto", "type": "TEXT" },
+        { "name": "monto", "type": "Float" },
+        { "name": "categoria", "type": "TEXT" },
+        { "name": "fin", "type": "TEXT" },
+        { "name": "month_id", "type": "TEXT" }
+      ],
+      "foreignKeys": [
+        { "columns": ["month_id"], "referencedTable": "Month", "referencedColumns": ["id"] }
+      ]
+    },
+    {
+      "tag": "CreateTable",
+      "table": "Credito",
+      "columns": [
+        { "name": "id", "type": "TEXT", "default": { "name": "gen_random_uuid()" }, "primaryKey": true },
+        { "name": "tipo", "type": "TEXT" },
+        { "name": "nombre", "type": "TEXT" },
+        { "name": "logoUrl", "type": "TEXT" },
+        { "name": "lineaCredito", "type": "Float" },
+        { "name": "saldoUtilizado", "type": "Float" },
+        { "name": "tasaInteresMensual", "type": "Float" },
+        { "name": "usuario", "type": "TEXT" },
+        { "name": "pagoMensual", "type": "Float" },
+        { "name": "pagosRealizados", "type": "Float" },
+        { "name": "pagosCompletados", "type": "Int32" },
+        { "name": "pagosTotales", "type": "Int32" },
+        { "name": "createdAt", "type": "DateTime", "default": { "name": "now()" } },
+        { "name": "updatedAt", "type": "DateTime", "default": { "name": "now()" } }
+      ]
+    }
+  ]
+}

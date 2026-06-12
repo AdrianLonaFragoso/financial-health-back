@@ -6,15 +6,15 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 const CREDITOS_SEED = [
-  { tipo: "tarjeta", nombre: "Banamex Costco", lineaCredito: 97500, saldoUtilizado: 36164.79, tasaInteresMensual: 6.53, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "HSBC Zero", lineaCredito: 120000, saldoUtilizado: 0, tasaInteresMensual: 7.71, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "Liverpool Grey", lineaCredito: 6000, saldoUtilizado: 0, tasaInteresMensual: 5.94, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "Rappi", lineaCredito: 78000, saldoUtilizado: 19392.55, tasaInteresMensual: 5.38, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "American Express", lineaCredito: 268000, saldoUtilizado: 10737.06, tasaInteresMensual: 7.44, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "NU", lineaCredito: 50000, saldoUtilizado: 0, tasaInteresMensual: 8.04, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "BBVA", lineaCredito: 180000, saldoUtilizado: 8371.56, tasaInteresMensual: 6.21, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "Liverpool Rosa", lineaCredito: 20000, saldoUtilizado: 1877.30, tasaInteresMensual: 5.18, usuario: "Adrian" },
-  { tipo: "tarjeta", nombre: "Plata", lineaCredito: 20000, saldoUtilizado: 1656.08, tasaInteresMensual: 9.02, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Banamex Costco", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/b/b8/Logo_de_Banamex.svg", lineaCredito: 97500, saldoUtilizado: 36164.79, tasaInteresMensual: 6.53, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "HSBC Zero", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/aa/HSBC_logo_%282018%29.svg", lineaCredito: 120000, saldoUtilizado: 0, tasaInteresMensual: 7.71, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Liverpool Grey", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/3/35/Liverpool_logo.svg", lineaCredito: 6000, saldoUtilizado: 0, tasaInteresMensual: 5.94, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Rappi", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/0/06/Rappi_logo.svg", lineaCredito: 78000, saldoUtilizado: 19392.55, tasaInteresMensual: 5.38, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "American Express", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/fa/American_Express_logo_%282018%29.svg", lineaCredito: 268000, saldoUtilizado: 10737.06, tasaInteresMensual: 7.44, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "NU", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/f/f7/Nubank_logo_2021.svg", lineaCredito: 50000, saldoUtilizado: 0, tasaInteresMensual: 8.04, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "BBVA", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/9/98/BBVA_logo_2025.svg", lineaCredito: 180000, saldoUtilizado: 8371.56, tasaInteresMensual: 6.21, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Liverpool Rosa", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/3/35/Liverpool_logo.svg", lineaCredito: 20000, saldoUtilizado: 1877.30, tasaInteresMensual: 5.18, usuario: "Adrian" },
+  { tipo: "tarjeta", nombre: "Plata", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/b/ba/Plata_Card_Logo.png", lineaCredito: 20000, saldoUtilizado: 1656.08, tasaInteresMensual: 9.02, usuario: "Adrian" },
 ];
 
 const SEED_DATA = [

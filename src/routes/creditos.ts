@@ -11,7 +11,7 @@ router.get("/", async (_req: Request, res: Response) => {
 });
 
 router.post("/", async (req: Request, res: Response) => {
-  const { tipo, nombre, logoUrl, lineaCredito, saldoUtilizado, tasaInteresMensual, usuario } = req.body;
+  const { tipo, nombre, logoUrl, lineaCredito, saldoUtilizado, tasaInteresMensual, usuario, pagoMensual, pagosRealizados, pagosCompletados, pagosTotales } = req.body;
 
   const credito = await prisma.credito.create({
     data: {
@@ -22,6 +22,10 @@ router.post("/", async (req: Request, res: Response) => {
       saldoUtilizado,
       tasaInteresMensual,
       usuario,
+      pagoMensual,
+      pagosRealizados,
+      pagosCompletados,
+      pagosTotales,
     },
   });
   res.status(201).json(credito);
@@ -36,7 +40,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     return;
   }
 
-  const { tipo, nombre, logoUrl, lineaCredito, saldoUtilizado, tasaInteresMensual, usuario } = req.body;
+  const { tipo, nombre, logoUrl, lineaCredito, saldoUtilizado, tasaInteresMensual, usuario, pagoMensual, pagosRealizados, pagosCompletados, pagosTotales } = req.body;
   const credito = await prisma.credito.update({
     where: { id },
     data: {
@@ -47,6 +51,10 @@ router.put("/:id", async (req: Request, res: Response) => {
       ...(saldoUtilizado !== undefined && { saldoUtilizado }),
       ...(tasaInteresMensual !== undefined && { tasaInteresMensual }),
       ...(usuario !== undefined && { usuario }),
+      ...(pagoMensual !== undefined && { pagoMensual }),
+      ...(pagosRealizados !== undefined && { pagosRealizados }),
+      ...(pagosCompletados !== undefined && { pagosCompletados }),
+      ...(pagosTotales !== undefined && { pagosTotales }),
     },
   });
   res.json(credito);

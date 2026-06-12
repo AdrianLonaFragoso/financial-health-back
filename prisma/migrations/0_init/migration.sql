@@ -1,33 +1,62 @@
-Loaded Prisma config from prisma.config.ts.
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
 
-Error: 
-`--to-schema-datamodel` was removed. Please use `--[from/to]-schema` instead.
+-- CreateTable
+CREATE TABLE "Month" (
+    "id" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "year" INTEGER NOT NULL,
+    "month" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-Usage
+    CONSTRAINT "Month_pkey" PRIMARY KEY ("id")
+);
 
-  $ prisma migrate diff [options]
+-- CreateTable
+CREATE TABLE "Ingreso" (
+    "id" TEXT NOT NULL,
+    "concepto" TEXT NOT NULL,
+    "monto" DOUBLE PRECISION NOT NULL,
+    "month_id" TEXT NOT NULL,
 
-Options
+    CONSTRAINT "Ingreso_pkey" PRIMARY KEY ("id")
+);
 
-  -h, --help               Display this help message
-  --config                 Custom path to your Prisma config file
-  -o, --output             Writes to a file instead of stdout
+-- CreateTable
+CREATE TABLE "Gasto" (
+    "id" TEXT NOT NULL,
+    "concepto" TEXT NOT NULL,
+    "monto" DOUBLE PRECISION NOT NULL,
+    "categoria" TEXT NOT NULL,
+    "fin" TEXT NOT NULL,
+    "month_id" TEXT NOT NULL,
 
-From and To inputs (1 `--from-...` and 1 `--to-...` must be provided):
-  --from-empty             Flag to assume from or to is an empty datamodel
-  --to-empty
+    CONSTRAINT "Gasto_pkey" PRIMARY KEY ("id")
+);
 
-  --from-schema            Path to a Prisma schema file, uses the datamodel for the diff
-  --to-schema
+-- CreateTable
+CREATE TABLE "Credito" (
+    "id" TEXT NOT NULL,
+    "tipo" TEXT NOT NULL,
+    "nombre" TEXT NOT NULL,
+    "logoUrl" TEXT,
+    "lineaCredito" DOUBLE PRECISION NOT NULL,
+    "saldoUtilizado" DOUBLE PRECISION NOT NULL,
+    "tasaInteresMensual" DOUBLE PRECISION NOT NULL,
+    "usuario" TEXT NOT NULL,
+    "pagoMensual" DOUBLE PRECISION,
+    "pagosRealizados" DOUBLE PRECISION,
+    "pagosCompletados" INTEGER,
+    "pagosTotales" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-  --from-migrations        Path to the Prisma Migrate migrations directory
-  --to-migrations
+    CONSTRAINT "Credito_pkey" PRIMARY KEY ("id")
+);
 
-  --from-config-datasource Flag to use the datasource from the Prisma config file
-  --to-config-datasource
+-- AddForeignKey
+ALTER TABLE "Ingreso" ADD CONSTRAINT "Ingreso_month_id_fkey" FOREIGN KEY ("month_id") REFERENCES "Month"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-Flags
-
-  --script                 Render a SQL script to stdout instead of the default human readable summary (not supported on MongoDB)
-  --exit-code              Change the exit code behavior to signal if the diff is empty or not (Empty: 0, Error: 1, Not empty: 2). Default behavior is Success: 0, Error: 1.
-
+-- AddForeignKey
+ALTER TABLE "Gasto" ADD CONSTRAINT "Gasto_month_id_fkey" FOREIGN KEY ("month_id") REFERENCES "Month"("id") ON DELETE CASCADE ON UPDATE CASCADE;
