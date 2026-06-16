@@ -35,3 +35,21 @@ model Gasto {
   monthId   String @map("month_id")
   month     Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
 }
+
+model Credito {
+  id                 String   @id @default(uuid())
+  tipo               String
+  nombre             String
+  logoUrl            String?
+  lineaCredito       Float
+  saldoUtilizado     Float
+  tasaInteresMensual Float
+  usuario            String
+  pagoMensual        Float?
+  pagosRealizados    Float?
+  pagosCompletados   Int?
+  pagosTotales       Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
