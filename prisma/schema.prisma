@@ -13,9 +13,19 @@ model Month {
   month    Int
   ingresos Ingreso[]
   gastos   Gasto[]
+  exclusiones GastoExclusion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model GastoExclusion {
+  id       String @id @default(cuid())
+  monthId  String @map("month_id")
+  month    Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  concepto String
+
+  @@map("gasto_exclusiones")
 }
 
 model Ingreso {

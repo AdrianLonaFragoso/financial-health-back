@@ -11,43 +11,160 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 }
 
+function shouldCopyGasto(fin: string, newYear: number, newMonth: number): boolean {
+  if (fin === "indefinido") return true;
+  const parts = fin.split("-");
+  if (parts.length !== 3) return false;
+  const monthStr = parts[1]?.toLowerCase();
+  const yearStr = parts[2];
+  const endMonth = MONTH_NAME_MAP[monthStr ?? ""];
+  const endYear = 2000 + parseInt(yearStr ?? "0", 10);
+  if (!endMonth || isNaN(endYear)) return false;
+  return endYear > newYear || (endYear === newYear && endMonth >= newMonth);
+}
+
 const router: Router = Router();
 
 router.get("/", async (_req: Request, res: Response) => {
   const meses = await prisma.month.findMany({
-    include: { ingresos: true, gastos: true },
+    include: { ingresos: true, gastos: true, exclusiones: true },
+    orderBy: [{ year: "asc" }, { month: "asc" }],
+  });
+
+  // Materializar indefinidos en todos los meses
+  for (const m of meses) {
+    await materializarIndefinidos(m);
+  }
+
+  const actualizados = await prisma.month.findMany({
+    include: { ingresos: true, gastos: true, exclusiones: true },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
-  res.json(meses);
+  res.json(actualizados);
 });
+
+async function materializarIndefinidos(mes: { id: string; year: number; month: number }) {
+  const existingConceptos = await prisma.gasto.findMany({
+    where: { monthId: mes.id },
+    select: { concepto: true },
+  });
+  const existingSet = new Set(existingConceptos.map((g) => g.concepto));
+
+  const exclusiones = await prisma.gastoExclusion.findMany({
+    where: { monthId: mes.id },
+    select: { concepto: true },
+  });
+  const excludedSet = new Set(exclusiones.map((e) => e.concepto));
+
+  const indefinidos = await prisma.gasto.findMany({
+    where: {
+      fin: "indefinido",
+      NOT: { monthId: mes.id },
+      month: {
+        OR: [
+          { year: { lt: mes.year } },
+          { year: mes.year, month: { lt: mes.month } },
+        ],
+      },
+    },
+  });
+
+  const seenConceptos = new Set<string>();
+  let creados = 0;
+  for (const g of indefinidos) {
+    if (seenConceptos.has(g.concepto)) continue;
+    seenConceptos.add(g.concepto);
+    if (existingSet.has(g.concepto)) continue;
+    if (excludedSet.has(g.concepto)) continue;
+
+    await prisma.gasto.create({
+      data: {
+        monthId: mes.id,
+        concepto: g.concepto,
+        monto: g.monto,
+        categoria: g.categoria,
+        fin: g.fin,
+      },
+    });
+    creados++;
+  }
+  return creados;
+}
 
 router.get("/:id", async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const mes = await prisma.month.findUnique({
     where: { id },
-    include: { ingresos: true, gastos: true },
+    include: { ingresos: true, gastos: true, exclusiones: true },
   });
   if (!mes) {
     res.status(404).json({ error: "Mes no encontrado" });
     return;
   }
-  res.json(mes);
+  // Auto-materializar gastos indefinidos de meses anteriores
+  await materializarIndefinidos(mes);
+
+  // Refetch con datos actualizados
+  const actualizado = await prisma.month.findUnique({
+    where: { id },
+    include: { ingresos: true, gastos: true, exclusiones: true },
+  });
+  res.json(actualizado);
 });
 
 router.post("/", async (req: Request, res: Response) => {
-  const { label, year, month, ingresos, gastos } = req.body;
+  const { label, year, month, ingresos, gastos, autoPopulate } = req.body;
+
+  let ingresosData = ingresos ?? [];
+  let gastosData = gastos ?? [];
+
+  if (autoPopulate) {
+    const recent = await prisma.month.findFirst({
+      where: {
+        OR: [
+          { year: { lt: year } },
+          { year, month: { lt: month } },
+        ],
+      },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      include: { ingresos: true, gastos: true },
+    });
+
+    if (recent) {
+      ingresosData = recent.ingresos.map((i) => ({
+        concepto: i.concepto,
+        monto: i.monto,
+      }));
+      gastosData = recent.gastos
+        .filter((g) => shouldCopyGasto(g.fin, year, month))
+        .map((g) => ({
+          concepto: g.concepto,
+          monto: g.monto,
+          categoria: g.categoria,
+          fin: g.fin,
+        }));
+    }
+  }
+
   const nuevo = await prisma.month.create({
     data: {
       label,
       year,
       month,
-      ingresos: { create: ingresos ?? [] },
-      gastos: { create: gastos ?? [] },
+      ingresos: { create: ingresosData },
+      gastos: { create: gastosData },
     },
     include: { ingresos: true, gastos: true },
   });
   res.status(201).json(nuevo);
 });
+
+function normalizeImportKey(k: string) {
+  const lower = k.toLowerCase().trim();
+  if (lower === "categoría") return "categoria";
+  if (lower === "vencimiento") return "fin";
+  return lower;
+}
 
 router.post("/import", async (req: Request, res: Response) => {
   const { type, rows } = req.body;
@@ -58,8 +175,9 @@ router.post("/import", async (req: Request, res: Response) => {
   }
 
   const firstRow = rows[0];
+  const rawKeys = Object.keys(firstRow);
   const metaKeys = new Set(["concepto", "categoria", "fin"]);
-  const monthNames = Object.keys(firstRow).filter((k) => !metaKeys.has(k));
+  const monthNames = rawKeys.filter((k) => !metaKeys.has(normalizeImportKey(k)));
 
   if (monthNames.length === 0) {
     res.status(400).json({ error: "No se encontraron columnas de meses en el CSV" });
@@ -104,8 +222,8 @@ router.post("/import", async (req: Request, res: Response) => {
       const monthId = monthRecords[monthName];
 
       if (type === "gasto") {
-        const categoria = (row.categoria as string)?.trim() || "Necesidades";
-        const fin = (row.fin as string)?.trim() || "indefinido";
+        const categoria = (row.categoria as string)?.trim() || (row["categoría"] as string)?.trim() || "Necesidades";
+        const fin = (row.fin as string)?.trim() || (row.vencimiento as string)?.trim() || "indefinido";
         await prisma.gasto.create({
           data: { monthId, concepto, monto: value, categoria, fin },
         });

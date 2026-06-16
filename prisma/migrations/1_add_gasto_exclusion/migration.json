@@ -1,0 +1,27 @@
+{
+  "version": "5.2",
+  "steps": [
+    {
+      "tag": "CreateTable",
+      "migrationId": "1_add_gasto_exclusion",
+      "model": "GastoExclusion",
+      "table": "gasto_exclusiones",
+      "columns": {
+        "id": { "name": "id", "type": "Text", "isRequired": true },
+        "month_id": { "name": "month_id", "type": "Text", "isRequired": true },
+        "concepto": { "name": "concepto", "type": "Text", "isRequired": true }
+      },
+      "primaryKey": {
+        "columns": ["id"]
+      },
+      "foreignKeys": [
+        {
+          "columns": ["month_id"],
+          "referencedTable": "Month",
+          "referencedColumns": ["id"],
+          "onDelete": "Cascade"
+        }
+      ]
+    }
+  ]
+}

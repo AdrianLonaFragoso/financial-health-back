@@ -59,6 +59,27 @@ router.delete("/:gastoId", async (req: Request, res: Response) => {
   }
 
   await prisma.gasto.delete({ where: { id: gastoId } });
+
+  // Si el concepto tiene un gasto indefinido en otro mes, crear exclusión
+  // para evitar que se re-materialice en este mes
+  const otroIndefinido = await prisma.gasto.findFirst({
+    where: {
+      concepto: existing.concepto,
+      fin: "indefinido",
+      NOT: { id: gastoId },
+    },
+  });
+  if (otroIndefinido) {
+    const exclExistente = await prisma.gastoExclusion.findFirst({
+      where: { monthId, concepto: existing.concepto },
+    });
+    if (!exclExistente) {
+      await prisma.gastoExclusion.create({
+        data: { monthId, concepto: existing.concepto },
+      });
+    }
+  }
+
   res.json({ message: "Gasto eliminado" });
 });
 

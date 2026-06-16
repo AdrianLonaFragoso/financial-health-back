@@ -5,6 +5,7 @@ import prisma from "./db";
 import mesesRouter from "./routes/meses";
 import gastosRouter from "./routes/gastos";
 import ingresosRouter from "./routes/ingresos";
+import exclusionesRouter from "./routes/exclusiones";
 import creditosRouter from "./routes/creditos";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -21,6 +22,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/meses", mesesRouter);
 app.use("/api/meses/:monthId/gastos", gastosRouter);
 app.use("/api/meses/:monthId/ingresos", ingresosRouter);
+app.use("/api/meses/:monthId/exclusiones", exclusionesRouter);
 app.use("/api/creditos", creditosRouter);
 
 app.get("/api/resumen", async (_req, res, next) => {
