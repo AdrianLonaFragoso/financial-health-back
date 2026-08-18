@@ -239,6 +239,57 @@ router.post("/import", async (req: Request, res: Response) => {
   res.status(201).json({ created, months: Object.keys(monthRecords).length });
 });
 
+router.put("/:id/plan", async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const { necesidades, estiloVida, ahorro } = req.body;
+
+  if (
+    typeof necesidades !== "number" ||
+    typeof estiloVida !== "number" ||
+    typeof ahorro !== "number" ||
+    !Number.isFinite(necesidades) ||
+    !Number.isFinite(estiloVida) ||
+    !Number.isFinite(ahorro) ||
+    necesidades < 0 ||
+    estiloVida < 0 ||
+    ahorro < 0 ||
+    Math.round((necesidades + estiloVida + ahorro) * 100) / 100 !== 100
+  ) {
+    res.status(400).json({ error: "Los porcentajes deben sumar 100" });
+    return;
+  }
+
+  const existing = await prisma.month.findUnique({ where: { id } });
+  if (!existing) {
+    res.status(404).json({ error: "Mes no encontrado" });
+    return;
+  }
+
+  const actualizado = await prisma.month.update({
+    where: { id },
+    data: { necesidades, estiloVida, ahorro },
+    include: { ingresos: true, gastos: true, exclusiones: true },
+  });
+  res.json(actualizado);
+});
+
+router.delete("/:id/plan", async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+
+  const existing = await prisma.month.findUnique({ where: { id } });
+  if (!existing) {
+    res.status(404).json({ error: "Mes no encontrado" });
+    return;
+  }
+
+  const actualizado = await prisma.month.update({
+    where: { id },
+    data: { necesidades: null, estiloVida: null, ahorro: null },
+    include: { ingresos: true, gastos: true, exclusiones: true },
+  });
+  res.json(actualizado);
+});
+
 router.delete("/:id", async (req: Request, res: Response) => {
   const id = req.params.id as string;
   await prisma.month.delete({ where: { id } });

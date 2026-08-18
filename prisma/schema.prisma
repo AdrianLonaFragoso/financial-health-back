@@ -15,6 +15,10 @@ model Month {
   gastos   Gasto[]
   exclusiones GastoExclusion[]
 
+  necesidades Float? @map("plan_necesidades")
+  estiloVida  Float? @map("plan_estilo_vida")
+  ahorro      Float? @map("plan_ahorro")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -62,4 +66,16 @@ model Credito {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PlanConfig {
+  id          Int      @id @default(1)
+  necesidades Float
+  estiloVida  Float    @map("estilo_vida")
+  ahorro      Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plan_config")
 }
