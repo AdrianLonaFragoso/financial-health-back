@@ -9,5 +9,11 @@
     "api/index.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/ensure-month",
+      "schedule": "0 6 1 * *"
+    }
+  ]
 }

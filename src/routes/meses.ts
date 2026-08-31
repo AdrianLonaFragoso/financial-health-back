@@ -23,9 +23,73 @@ function shouldCopyGasto(fin: string, newYear: number, newMonth: number): boolea
   return endYear > newYear || (endYear === newYear && endMonth >= newMonth);
 }
 
+const MESES_LABELS = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+function getMxNow(): { year: number; month: number; day: number } {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
+
+export async function ensureCurrentMonth(): Promise<{ created: boolean; month: { id: string; label: string; year: number; month: number } | null }> {
+  const { year, month } = getMxNow();
+  const existing = await prisma.month.findFirst({ where: { year, month } });
+  if (existing) return { created: false, month: existing };
+
+  const recent = await prisma.month.findFirst({
+    where: {
+      OR: [
+        { year: { lt: year } },
+        { year, month: { lt: month } },
+      ],
+    },
+    orderBy: [{ year: "desc" }, { month: "desc" }],
+    include: { ingresos: true, gastos: true },
+  });
+
+  const label = `${MESES_LABELS[month - 1]} ${year}`;
+
+  // Decisión usuario: ingresos copiar completos, gastos fijos + con fin vigente copiados.
+  const ingresosData = recent ? recent.ingresos.map((i) => ({ concepto: i.concepto, monto: i.monto })) : [];
+  const gastosData = recent
+    ? recent.gastos.filter((g) => shouldCopyGasto(g.fin, year, month)).map((g) => ({
+        concepto: g.concepto,
+        monto: g.monto,
+        categoria: g.categoria,
+        fin: g.fin,
+      }))
+    : [];
+
+  try {
+    const nuevo = await prisma.month.create({
+      data: {
+        label,
+        year,
+        month,
+        ingresos: { create: ingresosData },
+        gastos: { create: gastosData },
+      },
+    });
+    return { created: true, month: nuevo };
+  } catch (err: unknown) {
+    // Unique violation (race between cron and lazy) -> return existing safely, no deletion
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Unique") || msg.includes("unique") || msg.includes("duplicate")) {
+      const fallback = await prisma.month.findFirst({ where: { year, month } });
+      return { created: false, month: fallback };
+    }
+    throw err;
+  }
+}
+
 const router: Router = Router();
 
 router.get("/", async (_req: Request, res: Response) => {
+  // Fallback lazy: asegura corte del mes actual sin borrar nada (idempotente)
+  await ensureCurrentMonth();
+
   const meses = await prisma.month.findMany({
     include: { ingresos: true, gastos: true, exclusiones: true },
     orderBy: [{ year: "asc" }, { month: "asc" }],

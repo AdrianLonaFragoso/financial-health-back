@@ -21,6 +21,9 @@ model Month {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([year, month])
+  @@index([year, month])
 }
 
 model GastoExclusion {

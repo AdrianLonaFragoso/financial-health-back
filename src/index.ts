@@ -8,6 +8,7 @@ import ingresosRouter from "./routes/ingresos";
 import exclusionesRouter from "./routes/exclusiones";
 import creditosRouter from "./routes/creditos";
 import planRouter from "./routes/plan";
+import cronRouter from "./routes/cron";
 import { errorHandler } from "./middleware/errorHandler";
 
 const app: Express = express();
@@ -26,6 +27,7 @@ app.use("/api/meses/:monthId/ingresos", ingresosRouter);
 app.use("/api/meses/:monthId/exclusiones", exclusionesRouter);
 app.use("/api/creditos", creditosRouter);
 app.use("/api/plan", planRouter);
+app.use("/api/cron", cronRouter);
 
 app.get("/api/resumen", async (_req, res, next) => {
   try {
