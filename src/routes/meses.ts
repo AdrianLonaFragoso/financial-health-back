@@ -51,7 +51,7 @@ export async function ensureCurrentMonth(): Promise<{ created: boolean; month: {
 
   const label = `${MESES_LABELS[month - 1]} ${year}`;
 
-  // Decisión usuario: ingresos copiar completos, gastos fijos + con fin vigente copiados.
+  // Decisión usuario: ingresos copiar completos, gastos fijos + con fin vigente copiados. Preservar metodoPago/creditoId.
   const ingresosData = recent ? recent.ingresos.map((i) => ({ concepto: i.concepto, monto: i.monto })) : [];
   const gastosData = recent
     ? recent.gastos.filter((g) => shouldCopyGasto(g.fin, year, month)).map((g) => ({
@@ -59,6 +59,8 @@ export async function ensureCurrentMonth(): Promise<{ created: boolean; month: {
         monto: g.monto,
         categoria: g.categoria,
         fin: g.fin,
+        metodoPago: (g as unknown as { metodoPago?: string }).metodoPago ?? "efectivo",
+        creditoId: (g as unknown as { creditoId?: string | null }).creditoId ?? null,
       }))
     : [];
 
@@ -91,17 +93,17 @@ router.get("/", async (_req: Request, res: Response) => {
   await ensureCurrentMonth();
 
   const meses = await prisma.month.findMany({
-    include: { ingresos: true, gastos: true, exclusiones: true },
+    include: { ingresos: true, gastos: { include: { credito: true } }, exclusiones: true },
     orderBy: [{ year: "asc" }, { month: "asc" }],
   });
 
-  // Materializar indefinidos en todos los meses
+  // Materializar indefinidos en todos los meses (preserva metodoPago/creditoId)
   for (const m of meses) {
     await materializarIndefinidos(m);
   }
 
   const actualizados = await prisma.month.findMany({
-    include: { ingresos: true, gastos: true, exclusiones: true },
+    include: { ingresos: true, gastos: { include: { credito: true } }, exclusiones: true },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
   res.json(actualizados);
@@ -148,6 +150,8 @@ async function materializarIndefinidos(mes: { id: string; year: number; month: n
         monto: g.monto,
         categoria: g.categoria,
         fin: g.fin,
+        metodoPago: (g as unknown as { metodoPago?: string }).metodoPago ?? "efectivo",
+        creditoId: (g as unknown as { creditoId?: string | null }).creditoId ?? null,
       },
     });
     creados++;
@@ -159,7 +163,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const mes = await prisma.month.findUnique({
     where: { id },
-    include: { ingresos: true, gastos: true, exclusiones: true },
+    include: { ingresos: true, gastos: { include: { credito: true } }, exclusiones: true },
   });
   if (!mes) {
     res.status(404).json({ error: "Mes no encontrado" });
@@ -171,7 +175,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   // Refetch con datos actualizados
   const actualizado = await prisma.month.findUnique({
     where: { id },
-    include: { ingresos: true, gastos: true, exclusiones: true },
+    include: { ingresos: true, gastos: { include: { credito: true } }, exclusiones: true },
   });
   res.json(actualizado);
 });
@@ -187,14 +191,23 @@ async function buildCopyData(year: number, month: number) {
     orderBy: [{ year: "desc" }, { month: "desc" }],
     include: { ingresos: true, gastos: true },
   });
-  if (!recent) return { ingresosData: [] as { concepto: string; monto: number }[], gastosData: [] as { concepto: string; monto: number; categoria: string; fin: string }[], source: null as string | null };
+  if (!recent) return { ingresosData: [] as { concepto: string; monto: number }[], gastosData: [] as { concepto: string; monto: number; categoria: string; fin: string; metodoPago: string; creditoId: string | null }[], source: null as string | null };
   const ingresosData = recent.ingresos.map((i) => ({ concepto: i.concepto, monto: i.monto }));
   const gastosData = recent.gastos.filter((g) => shouldCopyGasto(g.fin, year, month)).map((g) => ({
     concepto: g.concepto,
     monto: g.monto,
     categoria: g.categoria,
     fin: g.fin,
+    metodoPago: (g as unknown as { metodoPago?: string }).metodoPago ?? "efectivo",
+    creditoId: (g as unknown as { creditoId?: string | null }).creditoId ?? null,
   }));
+  // Si creditoId ya no existe (fue borrado), degradar a efectivo para no fallar
+  if (gastosData.some((g) => g.creditoId)) {
+    const ids = [...new Set(gastosData.filter((g) => g.creditoId).map((g) => g.creditoId!))];
+    const existentes = await prisma.credito.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    const existSet = new Set(existentes.map((c) => c.id));
+    for (const g of gastosData) if (g.creditoId && !existSet.has(g.creditoId)) { g.creditoId = null; g.metodoPago = "efectivo"; }
+  }
   return { ingresosData, gastosData, source: recent.label };
 }
 
@@ -297,7 +310,7 @@ router.post("/bulk", async (req: Request, res: Response) => {
     try {
       const nuevo = await prisma.month.create({
         data: { label, year, month, ingresos: { create: ingresosData }, gastos: { create: gastosData } },
-        include: { ingresos: true, gastos: true },
+        include: { ingresos: true, gastos: { include: { credito: true } } },
       });
       created.push(nuevo);
     } catch (err: unknown) {
@@ -319,31 +332,9 @@ router.post("/", async (req: Request, res: Response) => {
   let gastosData = gastos ?? [];
 
   if (autoPopulate) {
-    const recent = await prisma.month.findFirst({
-      where: {
-        OR: [
-          { year: { lt: year } },
-          { year, month: { lt: month } },
-        ],
-      },
-      orderBy: [{ year: "desc" }, { month: "desc" }],
-      include: { ingresos: true, gastos: true },
-    });
-
-    if (recent) {
-      ingresosData = recent.ingresos.map((i) => ({
-        concepto: i.concepto,
-        monto: i.monto,
-      }));
-      gastosData = recent.gastos
-        .filter((g) => shouldCopyGasto(g.fin, year, month))
-        .map((g) => ({
-          concepto: g.concepto,
-          monto: g.monto,
-          categoria: g.categoria,
-          fin: g.fin,
-        }));
-    }
+    const { ingresosData: id, gastosData: gd } = await buildCopyData(year, month);
+    ingresosData = id;
+    gastosData = gd;
   }
 
   try {
@@ -355,7 +346,7 @@ router.post("/", async (req: Request, res: Response) => {
         ingresos: { create: ingresosData },
         gastos: { create: gastosData },
       },
-      include: { ingresos: true, gastos: true },
+      include: { ingresos: true, gastos: { include: { credito: true } } },
     });
     res.status(201).json(nuevo);
   } catch (err: unknown) {

@@ -57,6 +57,22 @@ app.get("/api/resumen", async (_req, res, next) => {
 
 app.use(errorHandler);
 
+// Recalculo automático de saldos al arrancar (no borra gastos, solo sincroniza Credito.saldoUtilizado = SUM(Gasto:monto) por crédito)
+async function autoRecalcularSaldos() {
+  try {
+    const creditos = await prisma.credito.findMany({ select: { id: true } });
+    for (const c of creditos) {
+      const sum = await prisma.gasto.aggregate({ where: { creditoId: c.id }, _sum: { monto: true } });
+      const total = sum._sum.monto ?? 0;
+      await prisma.credito.update({ where: { id: c.id }, data: { saldoUtilizado: total } });
+    }
+    if (creditos.length > 0) console.log(`[autoRecalcularSaldos] ${creditos.length} créditos sincronizados`);
+  } catch (e) {
+    console.warn("[autoRecalcularSaldos] omitido (tabla Gasto aún sin columna credito_id?)", e instanceof Error ? e.message : String(e));
+  }
+}
+autoRecalcularSaldos();
+
 if (process.env.VERCEL !== "1") {
   app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);

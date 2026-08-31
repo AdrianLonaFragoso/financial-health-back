@@ -44,13 +44,18 @@ model Ingreso {
 }
 
 model Gasto {
-  id        String @id @default(uuid())
-  concepto  String
-  monto     Float
-  categoria String
-  fin       String
-  monthId   String @map("month_id")
-  month     Month  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  concepto   String
+  monto      Float
+  categoria  String
+  fin        String
+  monthId    String   @map("month_id")
+  month      Month    @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  metodoPago String   @default("efectivo") @map("metodo_pago")
+  creditoId  String?  @map("credito_id")
+  credito    Credito? @relation(fields: [creditoId], references: [id], onDelete: SetNull)
+
+  @@index([creditoId])
 }
 
 model Credito {
@@ -66,6 +71,7 @@ model Credito {
   pagosRealizados    Float?
   pagosCompletados   Int?
   pagosTotales       Int?
+  gastos             Gasto[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
