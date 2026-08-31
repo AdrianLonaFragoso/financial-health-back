@@ -26,12 +26,24 @@
 - `ensureCurrentMonth` hace `findFirst` → si existe retorna; `create` con `try/catch` unique violation → fallback `findFirst` (race cron vs lazy).
 - `materializarIndefinidos` no borra, solo inserta si no existe concepto y no está excluido.
 
+## Anticipación trimestral y meses faltantes
+
+- **Auto actual:** día 1 00:00 MX crea solo `mxNow` (ej. Septiembre). No crea futuro solo.
+- **Anticipar manual (trimestral, ambos lados):**
+  - Topbar `GlobalMonthSelector` → botón “Anticipar” popover con `missingMonths` (retro, huecos entre primer mes y `mxNow`) + `next 3` (Oct/Nov/Dic) con preview `ingresos/gastos (fijos+vigentes)` y `source`.
+  - Dashboard → “Anticipar meses” modal con checkboxes trimestrales + faltantes, preview en vivo (`GET /api/meses/preview-bulk?count=3` y `GET /api/meses/preview?year&month`), bulk `POST /api/meses/bulk {months:[{year,month}...]}` secuencial para mantener cadena de copia (Oct copia de Sep recién creado).
+  - Al crear se autoselecciona el último mes creado (`setSelectedMonth(last.id)`); al re-entrar a la app `MonthContext` vuelve a `mxNow` (`currentLabel`).
+- **Preview:** `GET /api/meses/preview?year=2026&month=9` → `{ingresos:3,gastos:15,fijos:8,vigentes:7,source:"Agosto 2026",exists}`; `GET /api/meses/preview-bulk?count=3` → `{next:[...],missing:[...]}`.
+- **Faltantes retro:** si falta Mayo entre Junio y Agosto, se detecta escaneando `Month` entre `min` y `mxNow`; se puede crear retro sin afectar meses posteriores (copia del inmediato anterior existente).
+- **Sincronización:** anticipar Sep hoy evita que el cron del 1-Sep duplique (unique). Bulk anticipar 3 meses = 3 inserts ordenados cronológicamente.
+
 ## Operación
 
 - **Vercel:** configurar env `CRON_SECRET` (opcional pero recomendado). Cron envía `x-vercel-cron:1` y pasa sin secret. Manual requiere `Authorization: Bearer $CRON_SECRET` o `?secret=...`.
 - **Local test:** `curl http://localhost:3001/api/cron/ensure-month` → `{created:true, month:{label:"Septiembre 2026"...}}` segunda vez `{created:false}`.
+- **Anticipar manual:** `curl http://localhost:3001/api/meses/preview-bulk?count=3` y `curl -X POST http://localhost:3001/api/meses/bulk -H "Content-Type: application/json" -d '{"months":[{"year":2026,"month":9},{"year":2026,"month":10}]}'`
 - **Producción:** `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>/api/cron/ensure-month`
-- **Verificación:** `SELECT year,month,label FROM "Month" ORDER BY year,month;` debe mostrar nuevo mes al día 1 sin perder anteriores.
+- **Verificación:** `SELECT year,month,label FROM "Month" ORDER BY year,month;` debe mostrar meses anticipados + nuevo mes al día 1 sin perder anteriores.
 
 ## Riesgos mitigados
 

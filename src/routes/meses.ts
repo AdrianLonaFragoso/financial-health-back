@@ -176,6 +176,142 @@ router.get("/:id", async (req: Request, res: Response) => {
   res.json(actualizado);
 });
 
+async function buildCopyData(year: number, month: number) {
+  const recent = await prisma.month.findFirst({
+    where: {
+      OR: [
+        { year: { lt: year } },
+        { year, month: { lt: month } },
+      ],
+    },
+    orderBy: [{ year: "desc" }, { month: "desc" }],
+    include: { ingresos: true, gastos: true },
+  });
+  if (!recent) return { ingresosData: [] as { concepto: string; monto: number }[], gastosData: [] as { concepto: string; monto: number; categoria: string; fin: string }[], source: null as string | null };
+  const ingresosData = recent.ingresos.map((i) => ({ concepto: i.concepto, monto: i.monto }));
+  const gastosData = recent.gastos.filter((g) => shouldCopyGasto(g.fin, year, month)).map((g) => ({
+    concepto: g.concepto,
+    monto: g.monto,
+    categoria: g.categoria,
+    fin: g.fin,
+  }));
+  return { ingresosData, gastosData, source: recent.label };
+}
+
+// Preview endpoint: what would be copied for a future/missing month (no write)
+router.get("/preview", async (req: Request, res: Response) => {
+  const year = parseInt(String(req.query.year), 10);
+  const month = parseInt(String(req.query.month), 10);
+  if (!year || !month || month < 1 || month > 12) {
+    res.status(400).json({ error: "Parámetros year y month requeridos (1-12)" });
+    return;
+  }
+  const exists = await prisma.month.findFirst({ where: { year, month } });
+  if (exists) {
+    res.json({ year, month, label: exists.label, exists: true, ingresos: exists.id, gastos: 0, preview: null });
+    return;
+  }
+  const { ingresosData, gastosData, source } = await buildCopyData(year, month);
+  const fijos = gastosData.filter((g) => g.fin === "indefinido").length;
+  const vigentes = gastosData.length - fijos;
+  res.json({
+    year,
+    month,
+    label: `${MESES_LABELS[month - 1]} ${year}`,
+    exists: false,
+    source,
+    ingresos: ingresosData.length,
+    gastos: gastosData.length,
+    fijos,
+    vigentes,
+    ingresosDet: ingresosData,
+    gastosDet: gastosData,
+  });
+});
+
+router.get("/preview-bulk", async (req: Request, res: Response) => {
+  const count = Math.min(Math.max(parseInt(String(req.query.count ?? "3"), 10) || 3, 1), 6);
+  const startYear = parseInt(String(req.query.year), 10);
+  const startMonth = parseInt(String(req.query.month), 10);
+  let base: { year: number; month: number };
+  if (startYear && startMonth) base = { year: startYear, month: startMonth };
+  else {
+    const mx = getMxNow();
+    base = mx;
+  }
+  const results = [];
+  for (let i = 1; i <= count; i++) {
+    let y = base.year, m = base.month + i;
+    while (m > 12) { m -= 12; y += 1; }
+    const exists = await prisma.month.findFirst({ where: { year: y, month: m } });
+    if (exists) {
+      results.push({ year: y, month: m, label: exists.label, exists: true });
+    } else {
+      const { ingresosData, gastosData, source } = await buildCopyData(y, m);
+      results.push({
+        year: y, month: m, label: `${MESES_LABELS[m - 1]} ${y}`, exists: false, source,
+        ingresos: ingresosData.length, gastos: gastosData.length,
+        fijos: gastosData.filter((g) => g.fin === "indefinido").length,
+        vigentes: gastosData.filter((g) => g.fin !== "indefinido").length,
+      });
+    }
+  }
+  // Also missing months backwards
+  const all = await prisma.month.findMany({ orderBy: [{ year: "asc" }, { month: "asc" }] });
+  const missing: { year: number; month: number; label: string }[] = [];
+  if (all.length > 0) {
+    const min = all[0], mx = getMxNow();
+    let y = min.year, m = min.month;
+    const existsSet = new Set(all.map((a) => `${a.year}-${a.month}`));
+    while (y < mx.year || (y === mx.year && m < mx.month)) {
+      if (!existsSet.has(`${y}-${m}`)) missing.push({ year: y, month: m, label: `${MESES_LABELS[m - 1]} ${y}` });
+      m += 1; if (m > 12) { m = 1; y += 1; }
+    }
+  }
+  res.json({ next: results, missing });
+});
+
+// Bulk create for trimestral anticipation (sequential to keep copy chain)
+router.post("/bulk", async (req: Request, res: Response) => {
+  const { months } = req.body as { months: { year: number; month: number }[] };
+  if (!Array.isArray(months) || months.length === 0 || months.length > 6) {
+    res.status(400).json({ error: "months debe ser array de 1 a 6 elementos {year,month}" });
+    return;
+  }
+  // Sort chronologically to keep copy chain correct (missing first, then future)
+  const sorted = [...months].sort((a, b) => a.year - b.year || a.month - b.month);
+  const created = [];
+  const skipped = [];
+  for (const { year, month } of sorted) {
+    if (!year || !month || month < 1 || month > 12) {
+      skipped.push({ year, month, reason: "Datos inválidos" });
+      continue;
+    }
+    const exists = await prisma.month.findFirst({ where: { year, month } });
+    if (exists) {
+      skipped.push({ year, month, label: exists.label, reason: "Ya existe" });
+      continue;
+    }
+    const { ingresosData, gastosData } = await buildCopyData(year, month);
+    const label = `${MESES_LABELS[month - 1]} ${year}`;
+    try {
+      const nuevo = await prisma.month.create({
+        data: { label, year, month, ingresos: { create: ingresosData }, gastos: { create: gastosData } },
+        include: { ingresos: true, gastos: true },
+      });
+      created.push(nuevo);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Unique") || msg.includes("unique") || msg.includes("duplicate")) {
+        skipped.push({ year, month, reason: "Ya existe (race)" });
+      } else {
+        skipped.push({ year, month, reason: msg });
+      }
+    }
+  }
+  res.status(201).json({ created, skipped });
+});
+
 router.post("/", async (req: Request, res: Response) => {
   const { label, year, month, ingresos, gastos, autoPopulate } = req.body;
 
@@ -210,17 +346,26 @@ router.post("/", async (req: Request, res: Response) => {
     }
   }
 
-  const nuevo = await prisma.month.create({
-    data: {
-      label,
-      year,
-      month,
-      ingresos: { create: ingresosData },
-      gastos: { create: gastosData },
-    },
-    include: { ingresos: true, gastos: true },
-  });
-  res.status(201).json(nuevo);
+  try {
+    const nuevo = await prisma.month.create({
+      data: {
+        label,
+        year,
+        month,
+        ingresos: { create: ingresosData },
+        gastos: { create: gastosData },
+      },
+      include: { ingresos: true, gastos: true },
+    });
+    res.status(201).json(nuevo);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Unique") || msg.includes("unique") || msg.includes("duplicate")) {
+      res.status(409).json({ error: `El mes ${label ?? `${month}/${year}`} ya existe` });
+      return;
+    }
+    throw err;
+  }
 });
 
 function normalizeImportKey(k: string) {
