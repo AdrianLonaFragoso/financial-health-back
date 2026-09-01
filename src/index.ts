@@ -21,6 +21,24 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/api/debug/migrate-status", async (_req, res) => {
+  try {
+    const [monthCols, gastoCols, migrations] = await Promise.all([
+      prisma.$queryRawUnsafe("SELECT column_name FROM information_schema.columns WHERE table_name='Gasto' AND column_name IN ('metodo_pago','credito_id') ORDER BY column_name") as Promise<{ column_name: string }[]>,
+      prisma.$queryRawUnsafe("SELECT indexname FROM pg_indexes WHERE tablename='Month' AND indexname='Month_year_month_key'") as Promise<{ indexname: string }[]>,
+      prisma.$queryRawUnsafe("SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 5") as Promise<{ migration_name: string; finished_at: Date }[]>,
+    ]);
+    res.json({
+      gastoColumns: monthCols.map((c) => c.column_name),
+      monthUniqueIndex: gastoCols.length > 0 ? "present" : "missing",
+      recentMigrations: migrations,
+      autoRecalcularSaldos: "enabled",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.use("/api/meses", mesesRouter);
 app.use("/api/meses/:monthId/gastos", gastosRouter);
 app.use("/api/meses/:monthId/ingresos", ingresosRouter);
